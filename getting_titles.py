@@ -1,19 +1,12 @@
-import requests
+from gogoanime import get_search_results, get_anime_details
 
-# API endpoint
-url = "https://naruto.fandom.com/api.php?action=parse&page=List_of_Animated_Media&format=json"
+# Search for the anime
+search_results = get_search_results(query="Naruto Shippuden", page=1)
 
-# Fetch the JSON data
-response = requests.get(url)
-data = response.json()
+# Assuming the first result is the desired anime
+anime_id = search_results[0]['id']
 
-# Extract the links array
-links = data["parse"]["links"]
-
-# Extract the first 5 episode titles
-episode_titles = [link["*"] for link in links[:5]]
-
-# Print the episode titles
-print("First 5 episodes:")
-for i, title in enumerate(episode_titles, start=1):
-    print(f"{i}: {title}")
+# Get anime details, including episodes
+anime_details = get_anime_details(id=anime_id)
+total_episodes = anime_details[0]['total_episode']
+print(f"Total episodes: {total_episodes}")
