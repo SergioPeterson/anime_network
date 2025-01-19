@@ -1,16 +1,14 @@
 '''
 TODO:
 Add testing tools
-Remove Eps that have no characters
-Add a loading bar
-Trim character before sending them to network, aka in preprocessing
 '''
 
 import csv
-from Data_collection import Anime
+from DataCollection import Anime
 import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
+from tqdm import tqdm
 
 
 class Network:
@@ -35,8 +33,9 @@ class Network:
             next(csv_reader)  # Skip the header
             for row in csv_reader:
                 episode = row[0]
-                characters = row[1].split(", ")
-                all_episode_characters[episode] = characters
+                characters = row[1].split(", ") if row[1].strip() else []  # Handle empty character lists
+                if characters:  # Skip episodes with no characters
+                    all_episode_characters[episode] = characters
 
         # Step 2: Get a sorted list of all episode numbers
         all_episode_numbers = sorted(
@@ -52,16 +51,29 @@ class Network:
                 # Mark the character as present (1) in the current episode
                 self.characters_episodes[character][all_episode_numbers.index(episode_number)] = 1
 
+        # Step 4: Filter out characters who appear in fewer than three episodes
+        filtered_characters_episodes = {
+            character: appearances
+            for character, appearances in self.characters_episodes.items()
+            if sum(appearances) >= 3
+        }
+        self.characters_episodes = filtered_characters_episodes
+
+        # Step 5: Save the results if requested
         if save_results:
             with open("./data/characters.csv", mode="w", newline="", encoding="utf-8") as file:
                 csv_writer = csv.writer(file)
                 for character, appearances in self.characters_episodes.items():
                     csv_writer.writerow([character] + appearances)
 
-    def network(self):
+    def network(self, trimmed=False):
         """
         Build a graph where nodes represent characters and edges represent relationships
         based on their appearances in episodes.
+
+        Args:
+            trimmed (bool): If True, trim the graph using max_cutoff_for_connected_graph to remove weaker edges 
+                            while keeping the graph connected.
         """
         if not self.characters_episodes:
             print("No character data found. Please run preProcessing first.")
@@ -76,7 +88,7 @@ class Network:
 
         # Add edges with weights (dot products) between all pairs of characters
         characters = list(self.characters_episodes.keys())
-        for i, char1 in enumerate(characters):
+        for i, char1 in tqdm(enumerate(characters), desc="Building Graph"):
             for j, char2 in enumerate(characters):
                 if i < j:  # Avoid duplicate edges and self-loops
                     # Compute the dot product of their episode lists
@@ -89,6 +101,85 @@ class Network:
                     # Add the edge with the computed weight
                     self.anime_network.add_edge(char1, char2, weight=weight)
 
+        # Trim the graph if required
+        if trimmed:
+            cutoff_weight, percentage_removed = self.max_cutoff_for_connected_graph()
+            print(f"Graph trimmed. Maximum cutoff weight: {cutoff_weight}")
+            print(f"Percentage of edges removed: {percentage_removed:.2f}%")
+
+    def max_cutoff_for_connected_graph(self, print=False):
+        """
+        Optimized calculation of the maximum weight cutoff such that removing all edges with weight <= cutoff
+        keeps the graph connected but not fully connected. Updates the graph accordingly.
+
+        Returns:
+            float: The maximum weight cutoff.
+            float: Percentage of edges removed.
+        """
+        if not self.anime_network:
+            print("No network data found. Please run network first.")
+            return None, None
+
+        # Sort edges by weight in ascending order
+        edges_sorted = sorted(self.anime_network.edges(data=True), key=lambda x: x[2]["weight"])
+        total_edges = len(edges_sorted)
+
+        # Initialize a Union-Find structure for connectivity checks
+        parent = {node: node for node in self.anime_network.nodes}
+        rank = {node: 0 for node in self.anime_network.nodes}
+
+        def find(node):
+            """Find the representative of the set containing 'node'."""
+            if parent[node] != node:
+                parent[node] = find(parent[node])  # Path compression
+            return parent[node]
+
+        def union(node1, node2):
+            """Union of two sets containing 'node1' and 'node2'."""
+            root1 = find(node1)
+            root2 = find(node2)
+            if root1 != root2:
+                if rank[root1] > rank[root2]:
+                    parent[root2] = root1
+                elif rank[root1] < rank[root2]:
+                    parent[root1] = root2
+                else:
+                    parent[root2] = root1
+                    rank[root1] += 1
+
+        # Initially, union all nodes connected by an edge
+        for u, v, data in edges_sorted:
+            union(u, v)
+
+        # Track removed edges
+        edges_removed = 0
+
+        for i, (u, v, data) in tqdm(enumerate(edges_sorted), desc="Cutting Graph"):
+            # Remove edge by checking connectivity before and after
+            if find(u) == find(v):
+                edges_removed += 1
+                parent[v] = v  # Disconnect u and v
+
+            # Check if the graph is still connected
+            connected_components = len(set(find(node) for node in self.anime_network.nodes))
+            if connected_components > 1:
+                # Return the weight of the last edge before disconnection
+                cutoff_weight = edges_sorted[i - 1][2]["weight"] if i > 0 else 0
+                percentage_removed = (float(edges_removed) / float(total_edges)) * 100.0
+
+                # Update the graph by keeping edges with weight > cutoff_weight
+                edges_to_keep = [
+                    (x, y, d) for x, y, d in edges_sorted if d["weight"] > cutoff_weight
+                ]
+                self.anime_network = self.anime_network.edge_subgraph(edges_to_keep).copy()
+                return cutoff_weight, percentage_removed
+
+        # If all edges are removed and the graph is still connected
+        cutoff_weight = edges_sorted[-1][2]["weight"]
+        if print:
+            print(f"The maximum weight cutoff to keep the graph connected: {cutoff_weight}")
+        return cutoff_weight, 0
+    
     def display_network(self, min_edge=0):
         """
         Visualize the character relationship network as a graph with edges filtered by a minimum weight.
@@ -172,52 +263,6 @@ class Network:
         # Show the heatmap
         plt.show()
 
-    def max_cutoff_for_connected_graph(self, print=False):
-        """
-        Calculate the maximum weight cutoff such that removing all edges with weight <= cutoff
-        keeps the graph connected but not fully connected, and update the graph accordingly.
-
-        Returns:
-            float: The maximum weight cutoff.
-            float: Percentage of edges removed.
-            nx.Graph: The updated graph with edges removed.
-        """
-        if not self.anime_network:
-            print("No network data found. Please run network first.")
-            return None, None, None
-
-        # Sort edges by weight in ascending order
-        edges_sorted = sorted(self.anime_network.edges(data=True), key=lambda x: x[2]["weight"])
-        total_edges = len(edges_sorted)
-
-        for i, (u, v, data) in enumerate(edges_sorted):
-            # Create a copy of the graph to test edge removal
-            graph_copy = self.anime_network.copy()
-
-            # Remove edges with weight <= current edge weight
-            edges_to_remove = [(x, y) for x, y, d in edges_sorted[:i + 1]]
-            graph_copy.remove_edges_from(edges_to_remove)
-
-            # Check if the graph is still connected
-            if not nx.is_connected(graph_copy):
-                # Return the weight of the last edge before disconnection
-                cutoff_weight = edges_sorted[i - 1][2]["weight"] if i > 0 else 0
-                edges_to_keep = [(x, y) for x, y, d in edges_sorted if d["weight"] > cutoff_weight]
-                updated_graph = self.anime_network.edge_subgraph(edges_to_keep).copy()
-                edges_removed = len(edges_to_remove) - 1
-                percentage_removed = (float(edges_removed) / float(total_edges)) * 100.00
-
-                # Update the main network graph
-                self.anime_network = updated_graph
-                return cutoff_weight, percentage_removed
-
-        # If all edges are removed and the graph is still connected
-        cutoff_weight = edges_sorted[-1][2]["weight"]
-        if print:
-            print(f"The maximum weight cutoff to keep the graph connected: {max_cutoff}")
-            print(f"Percentage of links removed: {percentage_removed}%")    
-        return cutoff_weight, 0
-
     def relation_val(self, char1, char2):
         return self.anime_network[char1][char2]['weight']
 
@@ -255,17 +300,12 @@ if __name__ == "__main__":
     anime = Anime("Naruto", naruto_series, include_filler=False)
 
     # # Fetch and save episodes
-    anime.save_episodes()
+    # anime.save_episodes()
 
     # Process the saved episodes and save the character binary matrix
     network = Network()
-    network.preProcessing(save_results=True)
-    network.network()
-
-    # Find the maximum cutoff and display results
-    max_cutoff, percentage_removed = network.max_cutoff_for_connected_graph()
-    print(f"The maximum weight cutoff to keep the graph connected: {max_cutoff}")
-    print(f"Percentage of links removed: {percentage_removed}%")
+    network.preProcessing()
+    network.network(trimmed=True)
 
     print(network.get_top_largest_edges())
     print(network.top_friends("Jiraiya"))
