@@ -1,0 +1,7 @@
+beautifulsoup4
+requests
+colorama
+matplotlib
+numpy
+networkx
+tqdm

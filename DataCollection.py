@@ -5,11 +5,6 @@ import requests
 from colorama import Fore, Back, Style
 
 
-'''
-Add Testing tools, 
-that print, visulize and assert for each diff section to debug and find out where its going wrong
-'''
-
 class Series:
     """
     Represents a single anime series or season.
@@ -223,18 +218,4 @@ class Anime:
             print(episode)
 
 if __name__ == "__main__":
-    # Define series as a list of [name, mal_id]
-    naruto_series = [
-        ["Naruto", 20],
-        ["Naruto Shippuden", 1735]
-        # ["Boruto", 34566],
-    ]
-    anime = Anime("Naruto", naruto_series, include_filler=False)
-
-
-    # jjk_series = [
-    #     ["Jujutsu Kaisen", 40748],
-    #     ["Jujutsu Kaisen Season 2", 51009]
-    # ]
-    # anime = Anime("Jujutsu Kaisen", jjk_series, include_filler=False)
-    anime.save_episodes()
+    pass
