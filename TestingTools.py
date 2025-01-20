@@ -1,5 +1,5 @@
 from DataCollection import Anime, Series
-from Network import Network
+from Network import Anime_Network
 
 class Testing:
     """

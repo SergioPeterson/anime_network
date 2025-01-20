@@ -7,7 +7,7 @@ longest path in the network - network diametar
 '''
 from DataCollection import Anime
 from data.Constants import JJK
-from Network import Network
+from Network import Anime_Network
 import community as community_louvain
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -16,13 +16,13 @@ import networkx as nx
 class Analysis:
     def __init__(self, anime):
         # Initialize Network and load or build the graph
-        self.network = Network(anime)
+        self.network = Anime_Network(anime)
 
         try:
-            self.network = Network.load_network()
+            self.network = Anime_Network.load_network()
         except Exception as e:
             print(f"Failed to load existing network. Generating a new one... {e}")
-            self.network = Network(anime)
+            self.network = Anime_Network(anime)
             self.network.preProcessing()
             self.network.network()
         
@@ -179,29 +179,29 @@ if __name__ == "__main__":
     anime = Anime("Jujutsu Kaisen", JJK, include_filler=True)
     analysis = Analysis(anime)
 
-    print(f"Cutoff Value: {analysis.cutoff_val()}")
-    print(f"Cutoff Percentage: {analysis.cutoff_percentage():.2f}%")
-    print(f"Popularity Score of Yuji Itadori: {analysis.popularity_score('Yuji Itadori')}")
+    # print(f"Cutoff Value: {analysis.cutoff_val()}")
+    # print(f"Cutoff Percentage: {analysis.cutoff_percentage():.2f}%")
+    # print(f"Popularity Score of Yuji Itadori: {analysis.popularity_score('Yuji Itadori')}")
     
-    top_relationships = analysis.top_relationships("Yuji Itadori")
-    print(f"Top 3 Strongest Relationships for Yuji Itadori: {top_relationships}")
+    # top_relationships = analysis.top_relationships("Yuji Itadori")
+    # print(f"Top 3 Strongest Relationships for Yuji Itadori: {top_relationships}")
 
-    # Detect and display communities
-    communities = analysis.detect_communities()
-    print(f"Detected Communities: {communities}")
+    # # Detect and display communities
+    # communities = analysis.detect_communities()
+    # print(f"Detected Communities: {communities}")
 
-    # Modularity and 1 - Modularity
-    modularity = analysis.modularity()
-    print(f"Modularity Score: {modularity:.2f}")
-    print(f"1 - Modularity Score: {analysis.one_minus_modularity():.2f}")
+    # # Modularity and 1 - Modularity
+    # modularity = analysis.modularity()
+    # print(f"Modularity Score: {modularity:.2f}")
+    # print(f"1 - Modularity Score: {analysis.one_minus_modularity():.2f}")
 
-    # Shortest path between two characters
-    path, length = analysis.shortest_path("Yuji Itadori", "Satoru Gojo")
-    print(f"Shortest Path between Yuji Itadori and Satoru Gojo': {path} (Length: {length:.2f})")
+    # # Shortest path between two characters
+    # path, length = analysis.shortest_path("Yuji Itadori", "Satoru Gojo")
+    # print(f"Shortest Path between Yuji Itadori and Satoru Gojo': {path} (Length: {length:.2f})")
 
-    # Network diameter
-    diameter = analysis.network_diameter()
-    print(f"Network Diameter: {diameter}")
+    # # Network diameter
+    # diameter = analysis.network_diameter()
+    # print(f"Network Diameter: {diameter}")
 
-    print(f"The neighbors of itadori {analysis.get_neighbors("Yuji Itadori")}")
+    # print(f"The neighbors of itadori {analysis.get_neighbors("Yuji Itadori")}")
     analysis.display_network()

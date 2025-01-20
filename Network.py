@@ -13,9 +13,13 @@ import networkx as nx
 from tqdm import tqdm
 from data.Constants import ALL_NARUTO, JJK, NETWORK_FILE
 import pickle
+from pyvis.network import Network
+import webbrowser
 
 
-class Network:
+
+
+class Anime_Network:
     def __init__(self, anime) -> None:
         self.cutoff_weight = None
         self.percentage_removed = None
@@ -154,48 +158,50 @@ class Network:
         cutoff_weight = edges_sorted[-1][2]["weight"]
         return cutoff_weight, 0
     
-    def display_network(self, min_edge=0):
+    def display_network(self, min_edge=0, output_file="character_network.html"):
         """
-        Visualize the character relationship network as a graph with edges filtered by a minimum weight.
+        Visualize the character relationship network interactively using PyVis.
 
         Args:
             min_edge (float): The minimum weight for edges to be displayed.
+            output_file (str): The filename for saving the HTML visualization.
         """
         if not self.anime_network:
             print("No network data found. Please run network first.")
             return
 
+        # Create a new PyVis network
+        net = Network(notebook=False, cdn_resources="remote", height="750px", width="100%", bgcolor="#222222", font_color="white",
+                      select_menu=True, filter_menu=True)
+
+        # Set physics layout
+        net.barnes_hut()
+
         # Filter edges by the minimum weight
         filtered_edges = [
             (u, v, d) for u, v, d in self.anime_network.edges(data=True) if d["weight"] >= min_edge
         ]
-        # Create a subgraph with filtered edges
-        H = nx.Graph()
-        H.add_edges_from(filtered_edges)
-        # Add isolated nodes to ensure all characters are displayed
-        H.add_nodes_from(self.anime_network.nodes)
 
-        # Visualize the subgraph with filtered edges
-        plt.figure(figsize=(15, 15))  # Adjust the figure size
-        pos = nx.spring_layout(H)  # Generate a layout for the graph
-        nx.draw(
-            H,
-            pos,
-            with_labels=True,
-            node_color="lightblue",
-            node_size=500,
-            font_size=8,
-            edge_color="gray",
-        )
+        # Add nodes and edges
+        for u, v, data in filtered_edges:
+            # Add nodes with titles
+            net.add_node(u, label=u, title=f"{u} (Node)")
+            net.add_node(v, label=v, title=f"{v} (Node)")
 
-        # Add edge labels (weights)
-        edge_labels = nx.get_edge_attributes(H, "weight")
-        nx.draw_networkx_edge_labels(H, pos, edge_labels=edge_labels, font_size=7)
+            # Add edges with weights as labels
+            net.add_edge(u, v, value=data["weight"], label=f"Weight: {data['weight']:.2f}")
 
-        # Title and display
-        plt.title(f"Character Relationship Network (min_edge={min_edge})", fontsize=16)
-        plt.show()
+        # Map neighbors to node hover data
+        neighbor_map = net.get_adj_list()
+        for node in net.nodes:
+            node["title"] += " Neighbors:<br>" + "<br>".join(neighbor_map[node["id"]])
+            node["value"] = len(neighbor_map[node["id"]])  # Set node size based on connections
 
+        # Display the network
+        net.save_graph(output_file)
+        print(f"Network visualization saved to {output_file}. Open it in a browser to view.")
+        
+        
     def display_relationship(self):
         """
         Visualize the relationship between characters and their appearances across episodes using a heatmap.
@@ -295,7 +301,7 @@ class Network:
 if __name__ == "__main__":
     # NARUTO
     anime = Anime("Jujutsu Kaisen", JJK, include_filler=True)
-    network = Network(anime)
+    network = Anime_Network(anime)
 
     try:
         network.load_network()
