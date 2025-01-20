@@ -1,20 +1,17 @@
 '''
 Compare relationship between two people between two series (naruto and shippuden)
-Modulartiy - score between 0 and 1 1 means clear communties and 0 means no communties
-1-modularity
-the length between two characters (along with the path)
-longest path in the network - network diametar
 '''
 from DataCollection import Anime
-from data.Constants import JJK
+from data.Constants import JJK, NARUTO
 from Network import Anime_Network
 import community as community_louvain
 import matplotlib.pyplot as plt
 import networkx as nx
+import pandas as pd
 
 
 class Analysis:
-    def __init__(self, anime):
+    def __init__(self, anime, save_preprocessing=False):
         # Initialize Network and load or build the graph
         self.network = Anime_Network(anime)
 
@@ -23,7 +20,7 @@ class Analysis:
         except Exception as e:
             print(f"Failed to load existing network. Generating a new one... {e}")
             self.network = Anime_Network(anime)
-            self.network.preProcessing()
+            self.network.preProcessing(save_results=save_preprocessing)
             self.network.network()
         
         # Ensure the network is loaded
@@ -175,33 +172,128 @@ class Analysis:
         ]
         return neighbors
 
+    def longest_path(self):
+        """
+        Calculate the longest path (network diameter) and return the path, its length, 
+        and the two endpoint characters.
+
+        Returns:
+            Tuple[List[str], int, str, str]: A tuple containing the longest path (list of characters), 
+                                            its length, and the two endpoint characters.
+        """
+        if not self.network.anime_network:
+            raise ValueError("Network graph not initialized.")
+        
+        if not nx.is_connected(self.network.anime_network):
+            raise ValueError("The network graph is not connected, so no single diameter exists.")
+
+        # Find all-pairs shortest paths
+        all_pairs_shortest_paths = dict(nx.all_pairs_shortest_path(self.network.anime_network))
+        longest_path = []
+        max_length = 0
+        char1, char2 = None, None
+
+        # Iterate through all shortest paths to find the longest one
+        for source, paths in all_pairs_shortest_paths.items():
+            for target, path in paths.items():
+                if len(path) - 1 > max_length:  # Subtract 1 because length includes nodes, not edges
+                    max_length = len(path) - 1
+                    longest_path = path
+                    char1, char2 = path[0], path[-1]
+
+        return longest_path, max_length, char1, char2
+
+    def weighted_network_diameter(self):
+        """
+        Calculate the weighted network diameter, which is 1 / network diameter.
+
+        Returns:
+            float: Weighted network diameter.
+        """
+        diameter = self.network_diameter()
+        return 1 / diameter if diameter > 0 else float("inf")
+
+    def is_small_world_network(self):
+        """
+        Check if the network is a small-world network.
+
+        Returns:
+            bool: True if the network is small-world, False otherwise.
+        """
+        if not nx.is_connected(self.network.anime_network):
+            raise ValueError("The network graph is not connected.")
+        
+        avg_shortest_path_length = nx.average_shortest_path_length(self.network.anime_network)
+        clustering_coeff = nx.average_clustering(self.network.anime_network)
+
+        # Small-world networks typically have:
+        # - High clustering coefficient
+        # - Low average shortest path length
+        # These thresholds can be adjusted based on the dataset
+        return clustering_coeff > 0.5 and avg_shortest_path_length < 6
+
+    def average_shortest_path_length(self):
+        """
+        Calculate the average shortest path length across all nodes.
+
+        Returns:
+            float: Average shortest path length.
+        """
+        if not nx.is_connected(self.network.anime_network):
+            raise ValueError("The network graph is not connected.")
+        
+        return nx.average_shortest_path_length(self.network.anime_network)
+
+    def clustering_coefficient(self):
+        """
+        Calculate the clustering coefficient, the percentage of all possible triangles that are complete.
+
+        Returns:
+            float: Clustering coefficient.
+        """
+        return nx.average_clustering(self.network.anime_network)
+
 if __name__ == "__main__":
-    anime = Anime("Jujutsu Kaisen", JJK, include_filler=True)
-    analysis = Analysis(anime)
 
-    # print(f"Cutoff Value: {analysis.cutoff_val()}")
-    # print(f"Cutoff Percentage: {analysis.cutoff_percentage():.2f}%")
-    # print(f"Popularity Score of Yuji Itadori: {analysis.popularity_score('Yuji Itadori')}")
+    anime = Anime("Naruto", NARUTO, include_filler=False)
+    analysis = Analysis(anime, save_preprocessing=True)
+
+    print(f"Cutoff Value: {analysis.cutoff_val()}")
+    print(f"Cutoff Percentage: {analysis.cutoff_percentage():.2f}%\n")
+    print(f"Popularity Score of Naruto Uzumaki: {analysis.popularity_score('Naruto Uzumaki')}\n")
     
-    # top_relationships = analysis.top_relationships("Yuji Itadori")
-    # print(f"Top 3 Strongest Relationships for Yuji Itadori: {top_relationships}")
+    top_relationships = analysis.top_relationships("Naruto Uzumaki")
+    print(f"Top 3 Strongest Relationships for Naruto Uzumaki: {top_relationships}\n")
 
-    # # Detect and display communities
-    # communities = analysis.detect_communities()
-    # print(f"Detected Communities: {communities}")
+    # Detect and display communities
+    analysis.visualize_communities()
 
-    # # Modularity and 1 - Modularity
-    # modularity = analysis.modularity()
-    # print(f"Modularity Score: {modularity:.2f}")
-    # print(f"1 - Modularity Score: {analysis.one_minus_modularity():.2f}")
+    # Modularity and 1 - Modularity
+    modularity = analysis.modularity()
+    print(f"Modularity Score: {modularity:.2f}")
+    print(f"1 - Modularity Score: {analysis.one_minus_modularity():.2f}\n")
 
-    # # Shortest path between two characters
-    # path, length = analysis.shortest_path("Yuji Itadori", "Satoru Gojo")
-    # print(f"Shortest Path between Yuji Itadori and Satoru Gojo': {path} (Length: {length:.2f})")
+    # Shortest path between two characters
+    path, length = analysis.shortest_path("Naruto Uzumaki", "Tayuya")
+    print(f"Shortest Path between Naruto Uzumaki and Tayuya: {path} (Length: {length:.2f})\n")
 
-    # # Network diameter
-    # diameter = analysis.network_diameter()
-    # print(f"Network Diameter: {diameter}")
+    # Network diameter and longest path
+    longest_path, diameter, char1, char2 = analysis.longest_path()
+    print(f"Longest Path in the Network (Diameter): {longest_path} (Length: {diameter})")
+    print(f"The farthest characters are {char1} and {char2}.\n")
 
-    # print(f"The neighbors of itadori {analysis.get_neighbors("Yuji Itadori")}")
-    analysis.display_network()
+    # Weighted network diameter
+    weighted_diameter = analysis.weighted_network_diameter()
+    print(f"Weighted Network Diameter: {weighted_diameter:.5f}\n")
+
+    # Average shortest path length
+    avg_path_length = analysis.average_shortest_path_length()
+    print(f"Average Shortest Path Length: {avg_path_length:.2f}\n")
+
+    # Clustering coefficient
+    clustering_coeff = analysis.clustering_coefficient()
+    print(f"Clustering Coefficient: {clustering_coeff:.2f}\n")
+
+    # Small world network detection
+    is_small_world = analysis.is_small_world_network()
+    print(f"Is the network a small-world network? {'Yes' if is_small_world else 'No'}\n")

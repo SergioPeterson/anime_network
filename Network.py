@@ -3,7 +3,6 @@ TODO:
 Add and check meta data
     make sure that if re run with slightly diff perams it will warn you and re run not just give you the old one
 '''
-
 import csv
 import os
 from DataCollection import Anime
@@ -11,10 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
-from data.Constants import ALL_NARUTO, JJK, NETWORK_FILE
+from data.Constants import NARUTO, JJK, NETWORK_FILE
 import pickle
 from pyvis.network import Network
-import webbrowser
 
 
 
@@ -199,8 +197,7 @@ class Anime_Network:
 
         # Display the network
         net.save_graph(output_file)
-        print(f"Network visualization saved to {output_file}. Open it in a browser to view.")
-        
+        print(f"Network visualization saved to {output_file}. Open it in a browser to view.")  
         
     def display_relationship(self):
         """
@@ -300,7 +297,7 @@ class Anime_Network:
 
 if __name__ == "__main__":
     # NARUTO
-    anime = Anime("Jujutsu Kaisen", JJK, include_filler=True)
+    anime = Anime("Naruto", NARUTO, include_filler=False)
     network = Anime_Network(anime)
 
     try:
