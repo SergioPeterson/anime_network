@@ -22,6 +22,7 @@ This project provides tools to analyze and visualize relationships between chara
 ├── Schema.md            # Data schema and descriptions
 ├── TestingTools.py      # Tools for testing and validation
 ├── data                 # Directory for storing processed data
+├── runner.ipynb         # Run code and analysis 
 └── requirements.txt     # Python dependencies
 ```
 
@@ -74,7 +75,7 @@ This project provides tools to analyze and visualize relationships between chara
 Analyze relationships in "Naruto":
 ```python
 anime = Anime("Naruto", NARUTO, include_filler=False)
-analysis = Analysis(anime, save_preprocessing=True)
+analysis = Analysis(anime)
 ```
 Output:
 ```

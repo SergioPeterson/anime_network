@@ -255,7 +255,7 @@ class Analysis:
 
 if __name__ == "__main__":
 
-    anime = Anime("Naruto", NARUTO, include_filler=False)
+    anime = Anime("Naruto", NARUTO, include_filler=True)
     analysis = Analysis(anime, save_preprocessing=True)
 
     print(f"Cutoff Value: {analysis.cutoff_val()}")
@@ -265,35 +265,39 @@ if __name__ == "__main__":
     top_relationships = analysis.top_relationships("Naruto Uzumaki")
     print(f"Top 3 Strongest Relationships for Naruto Uzumaki: {top_relationships}\n")
 
-    # Detect and display communities
-    analysis.visualize_communities()
-
     # Modularity and 1 - Modularity
     modularity = analysis.modularity()
     print(f"Modularity Score: {modularity:.2f}")
     print(f"1 - Modularity Score: {analysis.one_minus_modularity():.2f}\n")
 
     # Shortest path between two characters
-    path, length = analysis.shortest_path("Naruto Uzumaki", "Tayuya")
-    print(f"Shortest Path between Naruto Uzumaki and Tayuya: {path} (Length: {length:.2f})\n")
+    path, length = analysis.shortest_path("Naruto Uzumaki", "Rock Lee")
+    print(f"Shortest Path between Naruto Uzumaki and Rock Lee: {path} (Length: {length:.2f})\n")
 
-    # Network diameter and longest path
-    longest_path, diameter, char1, char2 = analysis.longest_path()
-    print(f"Longest Path in the Network (Diameter): {longest_path} (Length: {diameter})")
-    print(f"The farthest characters are {char1} and {char2}.\n")
+    # # Network diameter and longest path
+    # longest_path, diameter, char1, char2 = analysis.longest_path()
+    # print(f"Longest Path in the Network (Diameter): {longest_path} (Length: {diameter})")
+    # print(f"The farthest characters are {char1} and {char2}.\n")
 
     # Weighted network diameter
-    weighted_diameter = analysis.weighted_network_diameter()
-    print(f"Weighted Network Diameter: {weighted_diameter:.5f}\n")
+    # weighted_diameter = analysis.weighted_network_diameter()
+    # print(f"Weighted Network Diameter: {weighted_diameter:.5f}\n")
 
     # Average shortest path length
-    avg_path_length = analysis.average_shortest_path_length()
-    print(f"Average Shortest Path Length: {avg_path_length:.2f}\n")
+    # avg_path_length = analysis.average_shortest_path_length()
+    # print(f"Average Shortest Path Length: {avg_path_length:.2f}\n")
 
-    # Clustering coefficient
-    clustering_coeff = analysis.clustering_coefficient()
-    print(f"Clustering Coefficient: {clustering_coeff:.2f}\n")
+    # # Clustering coefficient
+    # clustering_coeff = analysis.clustering_coefficient()
+    # print(f"Clustering Coefficient: {clustering_coeff:.2f}\n")
 
-    # Small world network detection
-    is_small_world = analysis.is_small_world_network()
-    print(f"Is the network a small-world network? {'Yes' if is_small_world else 'No'}\n")
+    # # Small world network detection
+    # is_small_world = analysis.is_small_world_network()
+    # print(f"Is the network a small-world network? {'Yes' if is_small_world else 'No'}\n")
+
+
+    analysis.display_network()
+
+    analysis.visualize_communities()
+
+    analysis.display_relationship()
