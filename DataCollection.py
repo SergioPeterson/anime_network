@@ -3,7 +3,7 @@ import time
 from bs4 import BeautifulSoup
 import requests
 from colorama import Fore, Back, Style
-
+from data.Constants import NARUTO_FANDOM, JJK_FILLER, NARUTO_FILLER, SHIPPUDEN_FILLER, BORUTO_FILLER, JJK_FANDOM
 
 class Series:
     """
@@ -11,58 +11,81 @@ class Series:
 
     Attributes:
         name (str): The name of the series.
-        mal_id (int): The MyAnimeList ID for the series.
-        episodes (list): A list of episodes for the series.
+        episodes (list[dict]): A list of episodes for the series.
+        filler_episodes (list[int]): A list of filler episode numbers.
+        fandom_link (str): The URL to the fandom page for the series.
     """
-    def __init__(self, name, mal_id):
+
+    def __init__(self, name: str, fandom_link: str, filler_link: str):
         self.name = name
-        self.mal_id = mal_id
-        self.url_template = f"https://api.jikan.moe/v4/anime/{self.mal_id}/episodes"
-        self.episodes = []
-        self.filler_episodes = []
+        self.fandom_link = fandom_link
+        self.filler_link = filler_link
 
-    def fetch_episodes(self, offset=0, debug=False):
-        """
-        Fetch episodes for the series and store them in the episodes attribute.
+    def fetch_episodes(self, include_filler=True) -> list[dict]:
+        """Fetch episodes from the fandom link."""
+        response = requests.get(self.fandom_link)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        tables = soup.find_all('table', class_='box table coloured bordered innerbordered style-basic fill-horiz')
+        episodes = []
 
-        Args:
-            offset (int): The starting episode number for this series (default: 0).
-        """
-        page = 1
-        while True:
-            url = f"{self.url_template}?page={page}"
-            response = requests.get(url)
+        for table in tables:
+            # Find the preceding headings
+            sub_heading = table.find_previous('h3')  # Specific subcategory
+            main_heading = table.find_previous('h2')  # Main category (e.g., Episodes, Movies)
 
-            if response.status_code != 200:
-                print(Fore.RED + f"[ERROR] Error {response.status_code} at {url}")
-                print(Style.RESET_ALL)
-                break
+            if sub_heading and main_heading:
+                # Combine main and sub headings for unique categories like "Naruto: Original Movies"
+                category_title = f"{main_heading.get_text(strip=True)} - {sub_heading.get_text(strip=True)}"
+            elif main_heading:
+                # Use the main heading if no subheading is found
+                category_title = main_heading.get_text(strip=True)
+            else:
+                continue
+            if category_title == "OVAs - Boruto: Naruto Next Generations":
+                category_title = "OVAs"
 
-            data = response.json()
-            for ep in data.get("data", []):
-                self.episodes.append({
-                    "series": self.name,
-                    "episode_number": offset + ep["mal_id"],
-                    "title": ep["title"]
-                })
-                if debug:
-                    print(f"[DEBUG] {self.episodes[-1]}")
-                    time.sleep(0.5)
+            rows = table.find_all('tr')[1:]
+            for idx, row in enumerate(rows, start=1):  # Use enumerate for dynamic numbering
+                cells = row.find_all(['th', 'td'])
+                if cells:
+                    if category_title == "OVAs":
+                        episodes.append({
+                            "Number": idx,
+                            "Title": cells[0].find('a').text.strip() if cells[0].find('a') else cells[0].text.strip(),
+                            "Link": f"https://naruto.fandom.com{cells[0].find('a')['href']}" if cells[0].find('a') else None,
+                        })
+                    else:
+                        episodes.append({
+                            "Number": cells[0].text.strip(),
+                            "Title": cells[1].find('a').text.strip() if cells[1].find('a') else cells[1].text.strip(),
+                            "Link": f"https://naruto.fandom.com{cells[1].find('a')['href']}" if cells[1].find('a') else None,
+                        })
 
-            # Stop if there are no more pages
-            if not data.get("pagination", {}).get("has_next_page"):
-                break
 
-            page += 1
+        if not include_filler:
+            return self.remove_filler(episodes)
+        # return episodes
 
-    def get_url_template(self):
-        return self.url_template
-    
-    def get_episodes(self):
-        return self.episodes
-    
-    def get_filler_episodes(self):
-        return self.filler_episodes
+    def remove_filler(self, episodes) -> list[dict]:
+        """Fetch filler episodes from the Anime Filler List."""
+        response = requests.get(self.filler_link)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        filler_section = soup.find('div', class_='filler')
+
+        filler_episodes = []
+        if filler_section:
+            episode_text = filler_section.find('span', class_='Episodes').text.strip()
+            for part in episode_text.split(','):
+                part = part.strip()
+                if '-' in part:
+                    start, end = map(int, part.split('-'))
+                    filler_episodes.extend(range(start, end + 1))
+                else:
+                    filler_episodes.append(int(part))
+        filler_episodes = sorted(filler_episodes)
+        episodes = [ep for ep in episodes if ep['Number'] not in filler_episodes]
+        return episodes
+
 
 class Anime:
     """
@@ -70,59 +93,35 @@ class Anime:
 
     Attributes:
         name (str): The name of the anime.
-        series_list (list): A list of Series objects.
-        all_episodes (list): A combined list of all episodes from all series.
+        all_media (list[dict]): A combined list of all episodes from all series.
         include_filler (bool): Whether to include filler episodes.
     """
-    def __init__(self, name, series_info, include_filler=True):
+
+    def __init__(self, name: str, include_filler: bool = True):
         self.name = name
-        self.series_list = [Series(name, mal_id) for name, mal_id in series_info]
-        self.all_episodes = []
+        self.all_media = []
         self.include_filler = include_filler
 
-    def fetch_all_episodes(self, debug=False):
-        """
-        Fetch episodes for all series, filter by filler preference, and store them in the all_episodes attribute.
-        """
-        offset = 0
+    def fetch_all_episodes(self):
+        """Fetch all episodes for the anime based on the series name."""
+        series = []
+        series_names = self.name.split("-")
+        for name in series_names:
+            match name:
+                case "naruto":
+                    series.append(Series("Naruto", NARUTO_FANDOM, NARUTO_FILLER))
+                case "shippuden":
+                    series.append(Series("Shippuden", NARUTO_FANDOM, SHIPPUDEN_FILLER))
+                case "boruto":
+                    series.append(Series("Boruto", NARUTO_FANDOM, BORUTO_FILLER))
+                case "jjk":
+                    series.append(Series("Jujutsu Kaisen", JJK_FANDOM, JJK_FILLER))
+                case _:
+                    raise ValueError("Unsupported anime name")
 
-        for series in self.series_list:
-            series.fetch_episodes(offset, debug=debug)
-            self.all_episodes.extend(series.episodes)
-            if series.episodes:
-                offset = series.episodes[-1]["episode_number"]
-    
-    @staticmethod
-    def make_link(episode_title):
-        replacements = {
-            " ": "_",
-            "'s": "%27s",
-            "?": "%3F",
-        }
-        for old, new in replacements.items():
-            episode_title = episode_title.replace(old, new)
-        return episode_title
-
-    def get_episode_urls(self):
-        """
-        Generate URLs for each episode for the Fandom Wiki or any source.
-        """
-        base_url = f"https://{self.name.lower().replace(" ", "-")}.fandom.com/wiki/"
-        if self.name == "Naruto":
-            base_url = f"{base_url}"
-            episode_urls = [
-                {"episode": f"Episode {ep['episode_number']}", "url": f"{base_url}{self.make_link(ep['title'])}"}
-                for ep in self.all_episodes
-            ]
-        elif self.name == "Jujutsu Kaisen":
-            base_url = f"{base_url}Episode_"
-            episode_urls = [
-                {"episode": f"Episode {ep['episode_number']}", "url": f"{base_url}{ep['episode_number']}"}
-                for ep in self.all_episodes
-            ]
-        else:
-            raise NotImplementedError(f"Episode URL generation is not implemented for {self.name}.")
-        return episode_urls
+        for serie in series:
+            episodes = serie.fetch_episodes(self.include_filler)
+            self.all_media.extend(episodes)
 
     def get_episode_characters(self, episode_url, debug=False, deep_debug=False):
         """
@@ -201,13 +200,12 @@ class Anime:
             csv_file_path (str): Path to the output CSV file.
             limit (int): Limit the number of episodes processed.
         """
-        self.fetch_all_episodes(debug=debug_ep)
-        episode_urls = self.get_episode_urls()
+        self.fetch_all_episodes()
         with open(csv_file_path, mode="w", newline="", encoding="utf-8") as file:
             csv_writer = csv.writer(file)
             csv_writer.writerow(["Episode", "Characters"])
 
-            for ep in episode_urls[:limit]:
+            for ep in self.all_media[:limit]:
                 characters = self.get_episode_characters(ep["url"], debug=debug_ch)
                 csv_writer.writerow([ep["episode"], ", ".join(characters)])
 
@@ -216,6 +214,3 @@ class Anime:
     def print_episodes(self):
         for episode in self.all_episodes:
             print(episode)
-
-if __name__ == "__main__":
-    pass
