@@ -113,3 +113,11 @@ This project is licensed under the MIT License. See the LICENSE file for details
 - **Your Name**: [GitHub Profile](https://github.com/SergioPeterson)
 
 
+## References
+[1] E. M. Gordon, T. O. Laumann, B. Adeyemo, J. F. Huckins, W. M. Kelley, and S. E. Petersen, “Generation and Evaluation of a Cortical Area Parcellation from Resting-State Correlations,” Cerebral Cortex, vol. 26, no. 1, pp. 288–303, Oct. 2014, doi: 10.1093/cercor/bhu239.
+
+[2] E. M. Gordon et al., “Precision functional mapping of individual human brains,” Neuron, vol. 95, no. 4, pp. 791-807.e7, Jul. 2017, doi: 10.1016/j.neuron.2017.07.011.
+
+[3] D. Papo, M. Zanin, J. H. Martínez, and J. M. Buldú, “Beware of the Small-World neuroscientist!,” Frontiers in Human Neuroscience, vol. 10, Mar. 2016, doi: 10.3389/fnhum.2016.00096.
+
+[4] J. Hlinka, D. Hartman, N. Jajcay, D. Tomeček, J. Tintěra, and M. Paluš, “Small-world bias of correlation networks: From brain to climate,” Chaos an Interdisciplinary Journal of Nonlinear Science, vol. 27, no. 3, Mar. 2017, doi: 10.1063/1.4977951.
